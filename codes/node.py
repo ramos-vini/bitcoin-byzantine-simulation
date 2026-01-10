@@ -34,5 +34,9 @@ class Node:
         self.mempool = []
         return block
 
+    # Add block if it extends the chain, or replace chain if needed
     def receive_block(self, block):
-        self.blockchain.add_block(block)
+        added = self.blockchain.add_block(block)
+        if not added:
+            simulated_new_chain = self.blockchain.chain + [block]
+            self.blockchain.replace_chain(simulated_new_chain)
