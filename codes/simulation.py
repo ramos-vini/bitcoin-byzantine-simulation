@@ -14,16 +14,16 @@ def run_simulation():
     fork_resolution_steps = []
     current_fork_steps = 0
 
-    # Metrics tracking
     proposed_blocks = {}  # {block_hash: valid?}
     accepted_blocks = set()  # unique hashes of blocks actually accepted
+    all_confirmed_txs = []  # track confirmed transactions for TCT
 
     for step in range(1, STEPS + 1):
         print(f"\n--- Step {step} ---")
 
         # Broadcast a random transaction
         sender = random.choice(nodes)
-        tx = sender.create_transaction()
+        tx = sender.create_transaction(step)
         for node in nodes:
             node.receive_transaction(tx)
 
@@ -34,7 +34,7 @@ def run_simulation():
                 block = node.mine_block()
                 if block:
                     mined_blocks.append(block)
-                    proposed_blocks[block.hash] = block.valid  # track as proposed
+                    proposed_blocks[block.hash] = block.valid
 
         # Network propagation
         for block in mined_blocks:
@@ -44,13 +44,10 @@ def run_simulation():
 
         # Process pending blocks
         for node in nodes:
-            accepted = node.process_pending_blocks()
+            accepted, confirmed_txs = node.process_pending_blocks(step)
             for b in accepted:
                 accepted_blocks.add(b.hash)
-                # epidemic propagation
-                for peer in nodes:
-                    if peer is not node:
-                        peer.receive_block(b)
+            all_confirmed_txs.extend(confirmed_txs)
 
         # Fork detection
         tips = set(node.blockchain.get_tip() for node in nodes)
@@ -61,7 +58,7 @@ def run_simulation():
             current_fork_steps = 0
 
         # Print chain lengths
-        chain_lengths = [node.blockchain.length() for node in nodes]
+        chain_lengths = [node.blockchain.heights[node.blockchain.get_tip()] + 1 for node in nodes]
         print(f"Chain lengths: {chain_lengths}")
 
     if current_fork_steps > 0:
@@ -75,7 +72,10 @@ def run_simulation():
 
     BAR_valid = (valid_accepted / valid_proposed * 100) if valid_proposed else 0
     BAR_invalid = (invalid_accepted / invalid_proposed * 100) if invalid_proposed else 0
-    TCT = STEPS / 2
+    TCT = 0
+    tct_list = [tx["step_confirmed"] - tx["step_created"] for tx in all_confirmed_txs if "step_created" in tx and "step_confirmed" in tx]
+    if tct_list:
+        TCT = sum(tct_list) / len(tct_list)
     FRT = sum(fork_resolution_steps) / len(fork_resolution_steps) if fork_resolution_steps else 0
 
     print("\n--- Final Metrics ---")
@@ -86,7 +86,7 @@ def run_simulation():
 
     print("\n--- Final chain lengths ---")
     for node in nodes:
-        print(f"Node {node.node_id}: {node.blockchain.length()}")
+        print(f"Node {node.node_id}: {node.blockchain.heights[node.blockchain.get_tip()] + 1}")
 
 if __name__ == "__main__":
     run_simulation()
