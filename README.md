@@ -1,4 +1,4 @@
-# Bitcoin-Inspired Byzantine Node Simulation
+# Bitcoin's Solution to the Byzantine Generals Problem
 
 This is a simplified Python simulation of a Bitcoin-inspired blockchain network designed for academic purposes, specifically to demonstrate decentralized consensus, fork resolution, and transaction confirmation under Byzantine conditions.
 
@@ -41,6 +41,6 @@ The system tracks key evaluation metrics:
 ### Running the Simulation
 
 ```bash
-git clone <repository_url>
+git clone https://github.com/ramos-vini/bitcoin-byzantine-simulation
 cd bitcoin-byzantine-simulation
 python3 -m codes.simulation
