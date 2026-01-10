@@ -46,10 +46,14 @@ def run_simulation():
         for node in nodes:
             accepted = node.process_pending_blocks()
             for b in accepted:
-                accepted_blocks.add(b.hash)  # only unique blocks
+                accepted_blocks.add(b.hash)
+                # epidemic propagation
+                for peer in nodes:
+                    if peer is not node:
+                        peer.receive_block(b)
 
         # Fork detection
-        tips = set(node.blockchain.get_latest_block().hash for node in nodes)
+        tips = set(node.blockchain.get_tip() for node in nodes)
         if len(tips) > 1:
             current_fork_steps += 1
         elif current_fork_steps > 0:

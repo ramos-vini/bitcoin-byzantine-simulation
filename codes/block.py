@@ -22,3 +22,6 @@ class Block:
             if self.hash.startswith(prefix):
                 break
             self.nonce += 1
+        if self.hash is None:
+            self.hash = self.compute_hash()
+

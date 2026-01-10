@@ -8,9 +8,12 @@ class Node:
     def __init__(self, node_id, byzantine=False):
         self.node_id = node_id
         self.byzantine = byzantine
-        self.blockchain = Blockchain()
+        genesis = Block("0", [])
+        genesis.mine()
+        self.blockchain = Blockchain(genesis)
         self.transactions = [] # mempool
         self.pending_blocks = [] # blocks received but not yet processed
+        self.seen_blocks = set()
 
     def create_transaction(self):
         tx = {
@@ -32,7 +35,7 @@ class Node:
     def mine_block(self):
         if not self.transactions:
             return None
-        prev_hash = self.blockchain.get_latest_block().hash
+        prev_hash = self.blockchain.get_tip()
         block = Block(prev_hash, self.transactions.copy())
         block.mine() # simplified PoW
 
@@ -46,25 +49,20 @@ class Node:
 
     # Store block in pending queue to simulate network delay
     def receive_block(self, block):
-        if block: # skip None blocks
-            self.pending_blocks.append(block)
+        if not block:
+            return
+
+        if block.hash in self.seen_blocks:
+            return
+
+        self.seen_blocks.add(block.hash)
+        self.pending_blocks.append(block)
 
     # Resolve pending blocks using longest-chain rule
     def process_pending_blocks(self):
         accepted_blocks = []
         for block in self.pending_blocks:
-            if block:
-                if self.blockchain.add_block(block):
-                    accepted_blocks.append(block)
+            if self.blockchain.add_block(block):
+                accepted_blocks.append(block)
         self.pending_blocks = []
         return accepted_blocks
-
-    # Return a simple list of block hashes (first 6 chars), safely handling None
-    def chain_snapshot(self):
-        snapshot = []
-        for b in self.blockchain.chain:
-            if b and b.hash: # skip None blocks or blocks without hash
-                snapshot.append(b.hash[:6])
-            else:
-                snapshot.append("------") # placeholder for empty block
-        return snapshot
