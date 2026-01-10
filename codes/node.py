@@ -1,42 +1,61 @@
 # codes/node.py
 
+import random
 from .blockchain import Blockchain
 from .block import Block
-from .transaction import Transaction
-import random
 
 class Node:
     def __init__(self, node_id, byzantine=False):
         self.node_id = node_id
         self.byzantine = byzantine
         self.blockchain = Blockchain()
-        self.mempool = []
+        self.transactions = [] # mempool
+        self.pending_blocks = [] # blocks received but not yet processed
 
     def create_transaction(self):
+        tx = {
+            "sender": self.node_id,
+            "receiver": random.randint(0, 9),
+            "amount": random.randint(1, 100)
+        }
         if self.byzantine and random.random() < 0.5:
-            # Invalid transaction (negative amount)
-            return Transaction(self.node_id, "X", -100)
-        return Transaction(self.node_id, random.randint(0, 10), random.randint(1, 10))
+            tx["amount"] = -tx["amount"]
+        self.transactions.append(tx)
+        return tx
 
     def receive_transaction(self, tx):
-        if tx.amount > 0:
-            self.mempool.append(tx)
+        if self.byzantine and random.random() < 0.2:
+            return  # ignore some tx
+        self.transactions.append(tx)
 
+    # Mine a block from local tip; returns block or None
     def mine_block(self):
-        if not self.mempool:
+        if not self.transactions:
             return None
-
-        block = Block(
-            self.blockchain.get_latest_block().hash,
-            self.mempool[:2]
-        )
-        block.mine()
-        self.mempool = []
+        prev_hash = self.blockchain.get_latest_block().hash
+        block = Block(prev_hash, self.transactions.copy())
+        block.mine() # simplified PoW
+        self.transactions = [] # clear mempool
         return block
 
-    # Add block if it extends the chain, or replace chain if needed
+    # Store block in pending queue to simulate network delay
     def receive_block(self, block):
-        added = self.blockchain.add_block(block)
-        if not added:
-            simulated_new_chain = self.blockchain.chain + [block]
-            self.blockchain.replace_chain(simulated_new_chain)
+        if block: # skip None blocks
+            self.pending_blocks.append(block)
+
+    # Resolve pending blocks using longest-chain rule
+    def process_pending_blocks(self):
+        for block in self.pending_blocks:
+            if block:
+                self.blockchain.add_block(block)
+        self.pending_blocks = []
+
+    # Return a simple list of block hashes (first 6 chars), safely handling None
+    def chain_snapshot(self):
+        snapshot = []
+        for b in self.blockchain.chain:
+            if b and b.hash: # skip None blocks or blocks without hash
+                snapshot.append(b.hash[:6])
+            else:
+                snapshot.append("------") # placeholder for empty block
+        return snapshot
