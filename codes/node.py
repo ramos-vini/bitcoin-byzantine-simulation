@@ -35,6 +35,12 @@ class Node:
         prev_hash = self.blockchain.get_latest_block().hash
         block = Block(prev_hash, self.transactions.copy())
         block.mine() # simplified PoW
+
+        # Byzantine nodes may produce invalid blocks
+        block.valid = True # add an attribute
+        if self.byzantine and random.random() < 0.3: # 30% chance block is invalid
+            block.valid = False
+
         self.transactions = [] # clear mempool
         return block
 
@@ -45,10 +51,13 @@ class Node:
 
     # Resolve pending blocks using longest-chain rule
     def process_pending_blocks(self):
+        accepted_blocks = []
         for block in self.pending_blocks:
             if block:
-                self.blockchain.add_block(block)
+                if self.blockchain.add_block(block):
+                    accepted_blocks.append(block)
         self.pending_blocks = []
+        return accepted_blocks
 
     # Return a simple list of block hashes (first 6 chars), safely handling None
     def chain_snapshot(self):
