@@ -3,6 +3,9 @@
 from .node import Node
 import random
 from collections import Counter
+import csv
+import os
+from datetime import datetime
 
 NUM_NODES = 1000
 BYZANTINE_RATIO = 0.3
@@ -105,6 +108,57 @@ def run_simulation():
     print("\n--- Final chain lengths ---")
     for node in nodes:
         print(f"Node {node.node_id}: {node.blockchain.heights[node.blockchain.get_tip()] + 1}")
+
+    save_results_csv(
+        NUM_NODES,
+        BYZANTINE_RATIO,
+        STEPS,
+        MINING_PROB,
+        BAR_valid,
+        BAR_invalid,
+        TCT,
+        FRT
+    )
+
+def save_results_csv(
+    NUM_NODES,
+    BYZANTINE_RATIO,
+    STEPS,
+    MINING_PROB,
+    BAR_valid,
+    BAR_invalid,
+    TCT,
+    FRT
+):
+    os.makedirs("datasets", exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"datasets/logs_{timestamp}.csv"
+
+    with open(filename, mode="w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "num_nodes",
+            "byzantine_ratio",
+            "steps",
+            "mining_prob",
+            "bar_valid",
+            "bar_invalid",
+            "tct",
+            "frt"
+        ])
+        writer.writerow([
+            NUM_NODES,
+            BYZANTINE_RATIO,
+            STEPS,
+            MINING_PROB,
+            BAR_valid,
+            BAR_invalid,
+            TCT,
+            FRT
+        ])
+
+    print(f"\nResults saved to {filename}")
 
 if __name__ == "__main__":
     run_simulation()
