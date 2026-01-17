@@ -2,17 +2,19 @@
 
 from .node import Node
 import random
+from collections import Counter
 
-NUM_NODES = 10
+NUM_NODES = 1000
 BYZANTINE_RATIO = 0.3
-STEPS = 20
+STEPS = 100
 MINING_PROB = 0.5  # chance for each node to mine per step
 
 def run_simulation():
     nodes = [Node(i, byzantine=(random.random() < BYZANTINE_RATIO)) for i in range(NUM_NODES)]
 
     fork_resolution_steps = []
-    current_fork_steps = 0
+    fork_active = False
+    fork_start_step = None
 
     proposed_blocks = {}  # {block_hash: valid?}
     accepted_blocks = set()  # unique hashes of blocks actually accepted
@@ -49,20 +51,32 @@ def run_simulation():
                 accepted_blocks.add(b.hash)
             all_confirmed_txs.extend(confirmed_txs)
 
-        # Fork detection
-        tips = set(node.blockchain.get_tip() for node in nodes)
-        if len(tips) > 1:
-            current_fork_steps += 1
-        elif current_fork_steps > 0:
-            fork_resolution_steps.append(current_fork_steps)
-            current_fork_steps = 0
+        # ----------------------------
+        # Fork detection & resolution
+        # (>50% consensus definition)
+        # ----------------------------
+        tips = [node.blockchain.get_tip() for node in nodes]
+        tip_counts = Counter(tips)
 
-        # Print chain lengths
+        dominant_share = max(tip_counts.values()) / NUM_NODES
+
+        # Fork starts
+        if len(tip_counts) > 1 and not fork_active:
+            fork_active = True
+            fork_start_step = step
+
+        # Fork resolves when >50% agree
+        if fork_active and dominant_share > 0.5:
+            fork_resolution_steps.append(step - fork_start_step)
+            fork_active = False
+            fork_start_step = None
+
         chain_lengths = [node.blockchain.heights[node.blockchain.get_tip()] + 1 for node in nodes]
         print(f"Chain lengths: {chain_lengths}")
 
-    if current_fork_steps > 0:
-        fork_resolution_steps.append(current_fork_steps)
+    # Close unresolved fork (if any)
+    if fork_active:
+        fork_resolution_steps.append(STEPS - fork_start_step)
 
     # Metrics computation
     valid_proposed = sum(1 for v in proposed_blocks.values() if v)
@@ -72,10 +86,14 @@ def run_simulation():
 
     BAR_valid = (valid_accepted / valid_proposed * 100) if valid_proposed else 0
     BAR_invalid = (invalid_accepted / invalid_proposed * 100) if invalid_proposed else 0
-    TCT = 0
-    tct_list = [tx["step_confirmed"] - tx["step_created"] for tx in all_confirmed_txs if "step_created" in tx and "step_confirmed" in tx]
-    if tct_list:
-        TCT = sum(tct_list) / len(tct_list)
+
+    tct_list = [
+        tx["step_confirmed"] - tx["step_created"]
+        for tx in all_confirmed_txs
+        if "step_created" in tx and "step_confirmed" in tx
+    ]
+    TCT = sum(tct_list) / len(tct_list) if tct_list else 0
+
     FRT = sum(fork_resolution_steps) / len(fork_resolution_steps) if fork_resolution_steps else 0
 
     print("\n--- Final Metrics ---")
